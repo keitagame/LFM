@@ -510,6 +510,8 @@ class FMSynth {
     this.freq = 440;
     this.gate = false;
     this.masterVol = 0.6;
+this.triggerFlag = false;
+
   }
 
   // ── Key On / Off ──────────────────────────────────────────────
@@ -586,6 +588,14 @@ class FMSynth {
     const amp  = this._atten2amp(op.envAtten, op.TL);
     const out  = Math.sin(op.phase + mod) * amp;
     op.prevOut = out;
+const oldPhase = op.phase;
+op.phase += (2 * Math.PI * freq) / this.sr;
+
+// ★ キャリアの位相が一周した瞬間にトリガー
+if (i === 3 && op.phase < oldPhase) {  // OP4 をキャリアとする
+    this.triggerFlag = true;
+}
+
     return out;
   }
 
@@ -941,7 +951,7 @@ document.getElementById('presetSel').addEventListener('change', function() {
 const oscCvs = document.getElementById('oscCanvas');
 const oscCtx2 = oscCvs.getContext('2d');
 let lastFpsTime = 0, frameCount = 0, fps = 0;
-
+let trigPos = 0;
 function drawOscilloscope(ts) {
   requestAnimationFrame(drawOscilloscope);
 
@@ -978,13 +988,20 @@ function drawOscilloscope(ts) {
   oscCtx2.beginPath(); oscCtx2.moveTo(0, h>>1); oscCtx2.lineTo(w, h>>1); oscCtx2.stroke();
 
   // Waveform — trigger on rising zero-cross
+
   const len = oscBuf.length;
-  let trigPos = 0;
+  
+if (synth.triggerFlag) {
+    trigPos = oscWr;
+    synth.triggerFlag = false;
+  }
   for (let i = 8; i < len - w - 8; i++) {
     const cur  = oscBuf[(oscWr - len + i + len) & (len-1)];
-    const next = oscBuf[(oscWr - len + i+1 + len) & (len-1)];
+  const next = oscBuf[(oscWr - len + i+1 + len) & (len-1)];
     if (cur < 0 && next >= 0) { trigPos = i; break; }
   }
+
+
 
   oscCtx2.strokeStyle = '#00e87a';
   oscCtx2.lineWidth = 1.5;
