@@ -1038,7 +1038,7 @@ function drawOscilloscope(ts) {
   oscCtx2.strokeStyle = '#00e87a';
   oscCtx2.lineWidth = 1.5;
   oscCtx2.shadowColor = '#00e87a';
-  oscCtx2.shadowBlur  = 5;
+  oscCtx2.shadowBlur  = 0;
   oscCtx2.beginPath();
 for (let x = 0; x < w; x++) {
     const idx = (trigPos + x) & (len - 1);  // ← これだけでOK
