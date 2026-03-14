@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>FAMICOMU FM GEN</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --bg: #000;
+      --fg: #e8e8e0;
+      --accent: #00e87a;
+      --orange: #ff6600;
+      --blue: #00aaff;
+      --dim: #444;
+      --dim2: #666;
+      --border: #222;
+      --panel: #050505;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: #020202;
+    }
+    .logo {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: #fff;
+    }
+    .logo em { color: var(--accent); font-style: normal; }
+    .tag {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: var(--dim2);
+      padding: 2px 7px;
+      border: 1px solid var(--dim);
+    }
+    .chip {
+      margin-left: auto;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 2px 8px;
+    }
+    .preset-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .preset-row label { font-size: 10px; color: var(--dim2); letter-spacing: 0.15em; }
+    select.preset-sel {
+      background: #000;
+      color: var(--fg);
+      border: 1px solid var(--dim);
+      padding: 3px 6px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+    }
+    select.preset-sel:focus { border-color: var(--accent); }
+
+    /* ── MAIN GRID ── */
+    .main {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── LEFT: OPERATOR PANEL ── */
+    .ops-panel {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .op-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .op-tab {
+      padding: 7px 4px;
+      text-align: center;
+      cursor: pointer;
+      color: var(--dim2);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      border-right: 1px solid var(--border);
+      user-select: none;
+      transition: color 0.1s;
+      position: relative;
+    }
+    .op-tab:last-child { border-right: none; }
+    .op-tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: transparent;
+      transition: background 0.1s;
+    }
+    .op-tab.active { color: var(--accent); }
+    .op-tab.active::after { background: var(--accent); }
+    .op-tab:hover:not(.active) { color: var(--fg); }
+
+    .op-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--dim) transparent;
+    }
+    .op-content::-webkit-scrollbar { width: 4px; }
+    .op-content::-webkit-scrollbar-thumb { background: var(--dim); }
+
+    .section-title {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: var(--dim);
+      margin-top: 12px;
+      margin-bottom: 7px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .param-row {
+      display: grid;
+      grid-template-columns: 38px 1fr 32px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .param-label {
+      font-size: 10px;
+      color: var(--dim2);
+      text-align: right;
+      letter-spacing: 0.05em;
+    }
+    .param-val {
+      font-size: 11px;
+      color: var(--accent);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .param-val.orange { color: var(--orange); }
+
+    /* Range sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+      border-radius: 0;
+    }
+    input[type=range].green::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px; height: 10px;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    input[type=range].green::-moz-range-thumb {
+      width: 10px; height: 10px;
+      background: var(--accent);
+      border: none; cursor: pointer;
+    }
+    input[type=range].orange::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px; height: 10px;
+      background: var(--orange);
+      cursor: pointer;
+    }
+    input[type=range].orange::-moz-range-thumb {
+      width: 10px; height: 10px;
+      background: var(--orange);
+      border: none; cursor: pointer;
+    }
+    input[type=range]:focus { outline: none; }
+
+    /* ── RIGHT PANEL ── */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px 10px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    /* Oscilloscope */
+    .osc-wrap {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
+    #oscCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+    .osc-label {
+      position: absolute;
+      top: 6px; left: 8px;
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      color: var(--dim);
+      pointer-events: none;
+    }
+    .osc-fps {
+      position: absolute;
+      top: 6px; right: 8px;
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    /* Envelope display */
+    .env-row {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+      flex-shrink: 0;
+    }
+    .env-box {
+      flex: 1;
+      position: relative;
+    }
+    .sub-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+    #envCanvas {
+      display: block;
+      width: 100%;
+      height: 52px;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+
+    /* Algorithm panel */
+    .alg-box {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .alg-box-inner {
+      display: flex;
+      gap: 0;
+    }
+    #algCanvas {
+      display: block;
+      background: #000;
+      flex-shrink: 0;
+    }
+    .alg-controls {
+      flex: 1;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      justify-content: center;
+      border-left: 1px solid var(--border);
+    }
+    .alg-param {
+      display: grid;
+      grid-template-columns: 30px 80px 24px;
+      align-items: center;
+      gap: 6px;
+    }
+    .alg-lbl {
+      font-size: 10px;
+      color: var(--dim2);
+      text-align: right;
+      letter-spacing: 0.05em;
+    }
+    .alg-val {
+      font-size: 11px;
+      color: var(--orange);
+      text-align: right;
+    }
+
+    /* Controls row */
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .ctrl-label {
+      font-size: 10px;
+      color: var(--dim2);
+      letter-spacing: 0.1em;
+    }
+    select.note-sel {
+      background: #000;
+      color: var(--fg);
+      border: 1px solid var(--dim);
+      padding: 5px 8px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    select.note-sel:focus { border-color: var(--accent); }
+    .freq-disp {
+      font-size: 12px;
+      color: var(--orange);
+      min-width: 78px;
+      font-variant-numeric: tabular-nums;
+    }
+    .btn {
+      padding: 6px 16px;
+      background: #000;
+      color: var(--fg);
+      border: 1px solid var(--dim);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      transition: all 0.08s;
+      user-select: none;
+      outline: none;
+    }
+    .btn:hover { border-color: var(--fg); color: #fff; }
+    .btn.accent { border-color: var(--accent); color: var(--accent); }
+    .btn.accent:hover { background: var(--accent); color: #000; }
+    .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .btn.warn { border-color: var(--orange); color: var(--orange); }
+    .btn.warn:hover { background: var(--orange); color: #000; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    .vol-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .vol-row .ctrl-label { white-space: nowrap; }
+
+    /* Status indicator */
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: background 0.1s;
+      flex-shrink: 0;
+    }
+    .status-dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FAMICOMU &nbsp;<em>FM</em></div>
+  <div class="tag">SOUND GENERATOR</div>
+  <div class="preset-row">
+    <label>PRESET</label>
+    <select class="preset-sel" id="presetSel">
+      <option value="">-- PRESET --</option>
+      <option value="epiano">ELECTRIC PIANO</option>
+      <option value="brass">BRASS</option>
+      <option value="bass">E-BASS</option>
+      <option value="flute">FLUTE</option>
+      <option value="bell">BELL</option>
+      <option value="organ">ORGAN</option>
+      <option value="strings">STRINGS</option>
+      <option value="guitar">GUITAR</option>
+    </select>
+  </div>
+  <div class="chip">YM2203 / OPN</div>
+</header>
+
+<div class="main">
+
+  <!-- ── LEFT: OP PANEL ── -->
+  <div class="ops-panel">
+    <div class="op-tabs">
+      <div class="op-tab active" data-op="0">OP1</div>
+      <div class="op-tab" data-op="1">OP2</div>
+      <div class="op-tab" data-op="2">OP3</div>
+      <div class="op-tab" data-op="3">OP4</div>
+    </div>
+    <div class="op-content" id="opContent"></div>
+  </div>
+
+  <!-- ── RIGHT ── -->
+  <div class="right-panel">
+
+    <!-- Oscilloscope -->
+    <div class="osc-wrap">
+      <canvas id="oscCanvas"></canvas>
+      <div class="osc-label">OSCILLOSCOPE</div>
+      <div class="osc-fps" id="oscFps"></div>
+    </div>
+
+    <!-- Envelope + Algorithm -->
+    <div class="env-row">
+      <div class="env-box">
+        <div class="sub-label">ENVELOPE — OP<span id="envOpLabel">1</span></div>
+        <canvas id="envCanvas"></canvas>
+      </div>
+      <div class="alg-box">
+        <div class="alg-box-inner">
+          <canvas id="algCanvas" width="190" height="72"></canvas>
+          <div class="alg-controls">
+            <div class="alg-param">
+              <div class="alg-lbl">ALG</div>
+              <input type="range" class="orange" id="algSlider" min="0" max="7" value="0">
+              <div class="alg-val" id="algVal">0</div>
+            </div>
+            <div class="alg-param">
+              <div class="alg-lbl">FB</div>
+              <input type="range" class="orange" id="fbSlider" min="0" max="7" value="0">
+              <div class="alg-val" id="fbVal">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transport controls -->
+    <div class="ctrl-row">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="ctrl-label">NOTE</div>
+      <select class="note-sel" id="noteSelect"></select>
+      <div class="freq-disp" id="freqDisp">440.0 Hz</div>
+      <button class="btn" id="holdBtn"
+        onmousedown="handleHoldOn()" onmouseup="handleHoldOff()"
+        ontouchstart="handleHoldOn(event)" ontouchend="handleHoldOff()">HOLD</button>
+      <button class="btn accent" id="playBtn">▶ PLAY</button>
+      <button class="btn warn" id="wavBtn">↓ WAV</button>
+      <div class="vol-row">
+        <div class="ctrl-label">VOL</div>
+        <input type="range" class="green" id="volSlider" min="0" max="100" value="70" style="width:70px">
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  FM SYNTHESIS ENGINE — YM2203 / OPN compatible
+// ================================================================
+
+class Operator {
+  constructor() {
+    this.phase    = 0;
+    this.envState = 0;   // 0=idle 1=attack 2=decay1 3=decay2 4=release
+    this.envAtten = 1023;
+    this.prevOut  = 0;
+    // Params (default = reasonable init sound)
+    this.TL  = 0;   // Total Level      0–127
+    this.MUL = 1;   // Freq Multiple    0–15  (0 = ×0.5)
+    this.DT  = 0;   // Detune           0–7
+    this.AR  = 31;  // Attack Rate      0–31
+    this.DR  = 5;   // Decay 1 Rate     0–31
+    this.SL  = 3;   // Sustain Level    0–15
+    this.SR  = 0;   // Decay 2 Rate     0–31
+    this.RR  = 4;   // Release Rate     0–15
+  }
+  clone() {
+    const o = new Operator();
+    Object.assign(o, this);
+    return o;
+  }
+}
+
+class FMSynth {
+  constructor(sr = 44100) {
+    this.sr   = sr;
+    this.ops  = [new Operator(), new Operator(), new Operator(), new Operator()];
+    this.alg  = 0;
+    this.fb   = 0;
+    this.fbBuf= [0, 0];
+    this.freq = 440;
+    this.gate = false;
+    this.masterVol = 0.6;
+  }
+
+  // ── Key On / Off ──────────────────────────────────────────────
+  noteOn(freq) {
+    this.freq = freq;
+    this.gate = true;
+    this.fbBuf[0] = this.fbBuf[1] = 0;
+    this.ops.forEach(op => {
+      op.phase    = 0;
+      op.envState = 1;    // attack
+      op.envAtten = 1023;
+    });
+  }
+  noteOff() {
+    this.gate = false;
+    this.ops.forEach(op => { if (op.envState !== 0) op.envState = 4; });
+  }
+
+  // ── Envelope update (per-sample) ─────────────────────────────
+  _envTick(op) {
+    switch (op.envState) {
+      case 1: {                                    // ATTACK
+        if (op.AR === 0) { op.envState = 0; break; }
+        const inc = op.AR === 31 ? 1024 : Math.pow(2, op.AR - 16);
+        op.envAtten = Math.max(0, op.envAtten - inc);
+        if (op.envAtten <= 0) { op.envAtten = 0; op.envState = 2; }
+        break;
+      }
+      case 2: {                                    // DECAY 1
+        if (op.DR === 0) break;
+        const tgt = op.SL * 64;
+        const inc = Math.pow(2, op.DR - 17);
+        op.envAtten = Math.min(tgt, op.envAtten + inc);
+        if (op.envAtten >= tgt) { op.envAtten = tgt; op.envState = 3; }
+        break;
+      }
+      case 3: {                                    // DECAY 2
+        if (op.SR === 0) break;
+        const inc = Math.pow(2, op.SR - 18);
+        op.envAtten = Math.min(1023, op.envAtten + inc);
+        if (op.envAtten >= 1023) { op.envAtten = 1023; op.envState = 0; }
+        break;
+      }
+      case 4: {                                    // RELEASE
+        if (op.RR === 0) break;
+        const inc = Math.pow(2, op.RR - 9);
+        op.envAtten = Math.min(1023, op.envAtten + inc);
+        if (op.envAtten >= 1023) { op.envAtten = 1023; op.envState = 0; }
+        break;
+      }
+    }
+  }
+
+  // ── Attenuation → linear amplitude ───────────────────────────
+  //   TL: 0–127, each step = 0.75 dB = 6 attenuation units (0–762)
+  //   Env: 0–1023
+  //   Combined: 0–1785; 2^(-x/128) → amplitude
+  _atten2amp(envA, tl) {
+    const total = Math.min(1023, envA + tl * 6);
+    if (total >= 1023) return 0;
+    return Math.pow(2, -total / 128);
+  }
+
+  // ── Single operator tick ──────────────────────────────────────
+  //   mod: modulation phase (radians)
+  _opTick(i, mod) {
+    const op   = this.ops[i];
+    const mul  = op.MUL === 0 ? 0.5 : op.MUL;
+    // DT: 0=0,1-3=positive,4=0,5-7=negative (cents table)
+    const dtC  = [0, 3.38, 6.76, 10.13, 0, -3.38, -6.76, -10.13][op.DT];
+    const freq  = this.freq * mul * Math.pow(2, dtC / 1200);
+    op.phase   += (2 * Math.PI * freq) / this.sr;
+    this._envTick(op);
+    const amp  = this._atten2amp(op.envAtten, op.TL);
+    const out  = Math.sin(op.phase + mod) * amp;
+    op.prevOut = out;
+    return out;
+  }
+
+  // ── Full tick (one sample) ────────────────────────────────────
+  tick() {
+    // Feedback on OP1 (self-mod)
+    const fbMod = this.fb === 0 ? 0
+      : (this.fbBuf[0] + this.fbBuf[1]) * 0.5 * Math.PI * Math.pow(2, this.fb - 1);
+
+    const P = Math.PI;
+    let out = 0;
+
+    switch (this.alg) {
+      case 0: {   // 1→2→3→4
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, o1 * P);
+        const o3 = this._opTick(2, o2 * P);
+        out = this._opTick(3, o3 * P);
+        break;
+      }
+      case 1: {   // (1+2)→3→4
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, 0);
+        const o3 = this._opTick(2, (o1 + o2) * P * 0.5);
+        out = this._opTick(3, o3 * P);
+        break;
+      }
+      case 2: {   // 1+(2→3)→4
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, 0);
+        const o3 = this._opTick(2, o2 * P);
+        out = this._opTick(3, (o1 + o3) * P * 0.5);
+        break;
+      }
+      case 3: {   // ((1→2)+3)→4
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, o1 * P);
+        const o3 = this._opTick(2, 0);
+        out = this._opTick(3, (o2 + o3) * P * 0.5);
+        break;
+      }
+      case 4: {   // (1→2)+(3→4)
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, o1 * P);
+        const o3 = this._opTick(2, 0);
+        const o4 = this._opTick(3, o3 * P);
+        out = (o2 + o4) * 0.5;
+        break;
+      }
+      case 5: {   // 1→(2+3+4)
+        const o1  = this._opTick(0, fbMod);
+        const mod = o1 * P;
+        const o2  = this._opTick(1, mod);
+        const o3  = this._opTick(2, mod);
+        const o4  = this._opTick(3, mod);
+        out = (o2 + o3 + o4) / 3;
+        break;
+      }
+      case 6: {   // (1→2)+3+4
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, o1 * P);
+        const o3 = this._opTick(2, 0);
+        const o4 = this._opTick(3, 0);
+        out = (o2 + o3 + o4) / 3;
+        break;
+      }
+      case 7: {   // 1+2+3+4 (additive)
+        const o1 = this._opTick(0, fbMod);
+        const o2 = this._opTick(1, 0);
+        const o3 = this._opTick(2, 0);
+        const o4 = this._opTick(3, 0);
+        out = (o1 + o2 + o3 + o4) * 0.25;
+        break;
+      }
+    }
+    this.fbBuf[1] = this.fbBuf[0];
+    this.fbBuf[0] = this.ops[0].prevOut;
+    return out * this.masterVol;
+  }
+}
+
+// ================================================================
+//  PRESETS
+// ================================================================
+const PRESETS = {
+  epiano: { alg:4, fb:5, ops:[
+    {TL:0,  MUL:1, DT:0, AR:31, DR:8,  SL:3, SR:0, RR:4},
+    {TL:45, MUL:1, DT:0, AR:31, DR:8,  SL:3, SR:0, RR:4},
+    {TL:0,  MUL:7, DT:0, AR:31, DR:14, SL:6, SR:3, RR:4},
+    {TL:65, MUL:7, DT:0, AR:31, DR:14, SL:6, SR:3, RR:4},
+  ]},
+  brass: { alg:0, fb:2, ops:[
+    {TL:0,  MUL:1, DT:0, AR:26, DR:5,  SL:2, SR:0, RR:5},
+    {TL:18, MUL:1, DT:1, AR:26, DR:5,  SL:2, SR:0, RR:5},
+    {TL:0,  MUL:1, DT:0, AR:26, DR:5,  SL:2, SR:0, RR:5},
+    {TL:18, MUL:1, DT:0, AR:26, DR:5,  SL:2, SR:0, RR:5},
+  ]},
+  bass: { alg:0, fb:6, ops:[
+    {TL:0,  MUL:1, DT:0, AR:31, DR:9,  SL:4, SR:0, RR:6},
+    {TL:35, MUL:2, DT:0, AR:31, DR:12, SL:6, SR:0, RR:6},
+    {TL:0,  MUL:1, DT:0, AR:31, DR:7,  SL:3, SR:0, RR:5},
+    {TL:45, MUL:1, DT:0, AR:31, DR:9,  SL:4, SR:0, RR:5},
+  ]},
+  flute: { alg:6, fb:1, ops:[
+    {TL:0,  MUL:1, DT:0, AR:18, DR:4,  SL:9, SR:1, RR:4},
+    {TL:12, MUL:1, DT:2, AR:18, DR:4,  SL:9, SR:1, RR:4},
+    {TL:0,  MUL:1, DT:0, AR:18, DR:4,  SL:9, SR:1, RR:4},
+    {TL:14, MUL:1, DT:1, AR:18, DR:4,  SL:9, SR:1, RR:4},
+  ]},
+  bell: { alg:4, fb:0, ops:[
+    {TL:0,  MUL:1, DT:0, AR:28, DR:16, SL:8, SR:5, RR:4},
+    {TL:72, MUL:1, DT:0, AR:28, DR:16, SL:8, SR:5, RR:4},
+    {TL:0,  MUL:7, DT:0, AR:28, DR:14, SL:8, SR:5, RR:4},
+    {TL:82, MUL:7, DT:0, AR:28, DR:14, SL:8, SR:5, RR:4},
+  ]},
+  organ: { alg:7, fb:0, ops:[
+    {TL:0,  MUL:1, DT:0, AR:31, DR:0,  SL:0, SR:0, RR:7},
+    {TL:8,  MUL:2, DT:0, AR:31, DR:0,  SL:0, SR:0, RR:7},
+    {TL:16, MUL:3, DT:0, AR:31, DR:0,  SL:0, SR:0, RR:7},
+    {TL:24, MUL:4, DT:0, AR:31, DR:0,  SL:0, SR:0, RR:7},
+  ]},
+  strings: { alg:5, fb:1, ops:[
+    {TL:0,  MUL:1, DT:0, AR:14, DR:6,  SL:10, SR:2, RR:3},
+    {TL:18, MUL:1, DT:2, AR:14, DR:6,  SL:10, SR:2, RR:3},
+    {TL:22, MUL:2, DT:1, AR:14, DR:6,  SL:10, SR:2, RR:3},
+    {TL:26, MUL:2, DT:3, AR:14, DR:6,  SL:10, SR:2, RR:3},
+  ]},
+  guitar: { alg:3, fb:4, ops:[
+    {TL:0,  MUL:1, DT:0, AR:31, DR:18, SL:4, SR:3, RR:6},
+    {TL:28, MUL:2, DT:0, AR:31, DR:18, SL:4, SR:3, RR:6},
+    {TL:0,  MUL:1, DT:1, AR:31, DR:16, SL:4, SR:3, RR:5},
+    {TL:36, MUL:1, DT:0, AR:31, DR:18, SL:4, SR:3, RR:6},
+  ]},
+};
+
+// ================================================================
+//  AUDIO ENGINE
+// ================================================================
+
+let audioCtx   = null;
+let scriptNode = null;
+const synth    = new FMSynth(44100);
+let oscBuf     = new Float32Array(4096);
+let oscWr      = 0;
+let playing    = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx   = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+  scriptNode = audioCtx.createScriptProcessor(512, 0, 1);
+  scriptNode.onaudioprocess = e => {
+    const out = e.outputBuffer.getChannelData(0);
+    for (let i = 0; i < out.length; i++) {
+      const s = synth.tick();
+      out[i]  = s;
+      oscBuf[oscWr] = s;
+      oscWr = (oscWr + 1) & (oscBuf.length - 1);
+    }
+  };
+  scriptNode.connect(audioCtx.destination);
+}
+
+function ensureAudio() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function handleHoldOn(e) {
+  if (e) e.preventDefault();
+  ensureAudio();
+  synth.noteOn(getCurrentFreq());
+  document.getElementById('statusDot').classList.add('on');
+}
+function handleHoldOff() {
+  synth.noteOff();
+  if (!playing) document.getElementById('statusDot').classList.remove('on');
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  ensureAudio();
+  playing = !playing;
+  const btn = document.getElementById('playBtn');
+  const dot = document.getElementById('statusDot');
+  if (playing) {
+    synth.noteOn(getCurrentFreq());
+    btn.textContent = '■ STOP';
+    btn.classList.add('active');
+    dot.classList.add('on');
+  } else {
+    synth.noteOff();
+    btn.textContent = '▶ PLAY';
+    btn.classList.remove('active');
+    dot.classList.remove('on');
+  }
+});
+
+document.getElementById('volSlider').addEventListener('input', function() {
+  synth.masterVol = this.value / 100;
+});
+synth.masterVol = 0.70;
+
+// ================================================================
+//  NOTE SELECTOR
+// ================================================================
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function noteFreq(name, oct) {
+  const idx = NOTE_NAMES.indexOf(name);
+  const midi = (oct + 1) * 12 + idx;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function buildNoteSelector() {
+  const sel = document.getElementById('noteSelect');
+  for (let oct = 2; oct <= 7; oct++) {
+    NOTE_NAMES.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = `${n}${oct}`;
+      opt.textContent = `${n}${oct}`;
+      if (n === 'A' && oct === 4) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function getCurrentFreq() {
+  const v    = document.getElementById('noteSelect').value;
+  let name, oct;
+  if (v[1] === '#') { name = v.slice(0,2); oct = parseInt(v.slice(2)); }
+  else              { name = v.slice(0,1); oct = parseInt(v.slice(1)); }
+  const freq = noteFreq(name, oct);
+  document.getElementById('freqDisp').textContent = freq.toFixed(2) + ' Hz';
+  return freq;
+}
+
+document.getElementById('noteSelect').addEventListener('change', () => {
+  getCurrentFreq();
+  if (playing) synth.noteOn(getCurrentFreq());
+});
+
+// ================================================================
+//  OPERATOR PARAM UI
+// ================================================================
+const OP_DEFS = [
+  { id:'TL',  label:'TL',  min:0, max:127, section:'LEVEL / TONE' },
+  { id:'MUL', label:'MUL', min:0, max:15,  section:null },
+  { id:'DT',  label:'DT',  min:0, max:7,   section:null },
+  { id:'AR',  label:'AR',  min:0, max:31,  section:'ENVELOPE' },
+  { id:'DR',  label:'D1R', min:0, max:31,  section:null },
+  { id:'SL',  label:'SL',  min:0, max:15,  section:null },
+  { id:'SR',  label:'D2R', min:0, max:31,  section:null },
+  { id:'RR',  label:'RR',  min:0, max:15,  section:null },
+];
+
+let currentOp = 0;
+
+function buildOpUI() {
+  const content = document.getElementById('opContent');
+  content.innerHTML = '';
+
+  OP_DEFS.forEach(p => {
+    if (p.section) {
+      const t = document.createElement('div');
+      t.className = 'section-title';
+      t.textContent = p.section;
+      content.appendChild(t);
+    }
+    const row  = document.createElement('div');
+    row.className = 'param-row';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'param-label';
+    lbl.textContent = p.label;
+
+    const val   = synth.ops[currentOp][p.id];
+    const range = document.createElement('input');
+    range.type  = 'range';
+    range.className = 'green';
+    range.min   = p.min;
+    range.max   = p.max;
+    range.value = val;
+    range.dataset.param = p.id;
+
+    const disp = document.createElement('div');
+    disp.className = 'param-val';
+    disp.id = `opv_${currentOp}_${p.id}`;
+    disp.textContent = String(val).padStart(p.max >= 100 ? 3 : 2, '0');
+
+    range.addEventListener('input', () => {
+      const v = parseInt(range.value);
+      disp.textContent = String(v).padStart(p.max >= 100 ? 3 : 2, '0');
+      synth.ops[currentOp][p.id] = v;
+      drawEnvelope();
+    });
+
+    row.appendChild(lbl);
+    row.appendChild(range);
+    row.appendChild(disp);
+    content.appendChild(row);
+  });
+}
+
+document.querySelectorAll('.op-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.op-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentOp = parseInt(tab.dataset.op);
+    document.getElementById('envOpLabel').textContent = currentOp + 1;
+    buildOpUI();
+    drawEnvelope();
+  });
+});
+
+// ================================================================
+//  GLOBAL PARAMS (ALG / FB)
+// ================================================================
+document.getElementById('algSlider').addEventListener('input', function() {
+  const v = parseInt(this.value);
+  document.getElementById('algVal').textContent = v;
+  synth.alg = v;
+  drawAlgorithm(v);
+});
+
+document.getElementById('fbSlider').addEventListener('input', function() {
+  const v = parseInt(this.value);
+  document.getElementById('fbVal').textContent = v;
+  synth.fb = v;
+});
+
+// ================================================================
+//  PRESETS
+// ================================================================
+document.getElementById('presetSel').addEventListener('change', function() {
+  const p = PRESETS[this.value];
+  if (!p) return;
+  synth.alg = p.alg;
+  synth.fb  = p.fb;
+  p.ops.forEach((op, i) => Object.assign(synth.ops[i], op));
+  document.getElementById('algSlider').value = p.alg;
+  document.getElementById('algVal').textContent = p.alg;
+  document.getElementById('fbSlider').value = p.fb;
+  document.getElementById('fbVal').textContent = p.fb;
+  buildOpUI();
+  drawEnvelope();
+  drawAlgorithm(p.alg);
+  if (playing) synth.noteOn(getCurrentFreq());
+  this.value = '';   // reset select
+});
+
+// ================================================================
+//  OSCILLOSCOPE
+// ================================================================
+const oscCvs = document.getElementById('oscCanvas');
+const oscCtx2 = oscCvs.getContext('2d');
+let lastFpsTime = 0, frameCount = 0, fps = 0;
+
+function drawOscilloscope(ts) {
+  requestAnimationFrame(drawOscilloscope);
+
+  // FPS
+  frameCount++;
+  if (ts - lastFpsTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastFpsTime = ts;
+    document.getElementById('oscFps').textContent = fps + ' FPS';
+  }
+
+  // Resize
+  if (oscCvs.width !== oscCvs.offsetWidth || oscCvs.height !== oscCvs.offsetHeight) {
+    oscCvs.width  = oscCvs.offsetWidth;
+    oscCvs.height = oscCvs.offsetHeight;
+  }
+
+  const w = oscCvs.width, h = oscCvs.height;
+  oscCtx2.clearRect(0, 0, w, h);
+
+  // Grid
+  oscCtx2.strokeStyle = '#0d1a12';
+  oscCtx2.lineWidth = 1;
+  const gx = 40, gy = Math.floor(h / 6);
+  for (let x = 0; x <= w; x += gx) {
+    oscCtx2.beginPath(); oscCtx2.moveTo(x, 0); oscCtx2.lineTo(x, h); oscCtx2.stroke();
+  }
+  for (let y = 0; y <= h; y += gy) {
+    oscCtx2.beginPath(); oscCtx2.moveTo(0, y); oscCtx2.lineTo(w, y); oscCtx2.stroke();
+  }
+  // Center
+  oscCtx2.strokeStyle = '#162a1e';
+  oscCtx2.beginPath(); oscCtx2.moveTo(0, h>>1); oscCtx2.lineTo(w, h>>1); oscCtx2.stroke();
+
+  // Waveform — trigger on rising zero-cross
+  const len = oscBuf.length;
+  let trigPos = 0;
+  for (let i = 8; i < len - w - 8; i++) {
+    const cur  = oscBuf[(oscWr - len + i + len) & (len-1)];
+    const next = oscBuf[(oscWr - len + i+1 + len) & (len-1)];
+    if (cur < 0 && next >= 0) { trigPos = i; break; }
+  }
+
+  oscCtx2.strokeStyle = '#00e87a';
+  oscCtx2.lineWidth = 1.5;
+  oscCtx2.shadowColor = '#00e87a';
+  oscCtx2.shadowBlur  = 5;
+  oscCtx2.beginPath();
+  for (let x = 0; x < w; x++) {
+    const idx = (oscWr - len + trigPos + x + len * 2) & (len-1);
+    const s   = oscBuf[idx];
+    const y   = (h >> 1) - s * (h * 0.44);
+    x === 0 ? oscCtx2.moveTo(x, y) : oscCtx2.lineTo(x, y);
+  }
+  oscCtx2.stroke();
+  oscCtx2.shadowBlur = 0;
+}
+
+// ================================================================
+//  ENVELOPE DISPLAY
+// ================================================================
+function simEnvStep(op) {
+  switch (op.envState) {
+    case 1: {
+      if (op.AR === 0) { op.envState = 0; break; }
+      const inc = op.AR === 31 ? 1024 : Math.pow(2, op.AR - 16);
+      op.envAtten = Math.max(0, op.envAtten - inc);
+      if (op.envAtten <= 0) { op.envAtten = 0; op.envState = 2; }
+      break;
+    }
+    case 2: {
+      if (op.DR === 0) break;
+      const tgt = op.SL * 64;
+      const inc = Math.pow(2, op.DR - 17);
+      op.envAtten = Math.min(tgt, op.envAtten + inc);
+      if (op.envAtten >= tgt) { op.envAtten = tgt; op.envState = 3; }
+      break;
+    }
+    case 3: {
+      if (op.SR === 0) break;
+      const inc = Math.pow(2, op.SR - 18);
+      op.envAtten = Math.min(1023, op.envAtten + inc);
+      if (op.envAtten >= 1023) { op.envAtten = 1023; op.envState = 0; }
+      break;
+    }
+    case 4: {
+      if (op.RR === 0) break;
+      const inc = Math.pow(2, op.RR - 9);
+      op.envAtten = Math.min(1023, op.envAtten + inc);
+      if (op.envAtten >= 1023) { op.envAtten = 1023; op.envState = 0; }
+      break;
+    }
+  }
+}
+
+function drawEnvelope() {
+  const cv  = document.getElementById('envCanvas');
+  cv.width  = cv.offsetWidth || 300;
+  cv.height = cv.offsetHeight || 52;
+  const ctx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const src = synth.ops[currentOp];
+  const op  = { AR: src.AR, DR: src.DR, SL: src.SL, SR: src.SR, RR: src.RR,
+                envState: 1, envAtten: 1023 };
+
+  const TOTAL  = 44100 * 2.5;
+  const NOTEOFF= 44100 * 1.6;
+  const step   = Math.ceil(TOTAL / w);
+
+  ctx.strokeStyle = '#ff6600';
+  ctx.lineWidth   = 1.5;
+  ctx.shadowColor = '#ff6600';
+  ctx.shadowBlur  = 3;
+  ctx.beginPath();
+
+  let released = false;
+  for (let x = 0; x < w; x++) {
+    const sn = x * step;
+    if (sn >= NOTEOFF && !released) { op.envState = 4; released = true; }
+    for (let s = 0; s < step; s++) simEnvStep(op);
+    const amp = 1 - op.envAtten / 1023;
+    const y   = h - 2 - amp * (h - 5);
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Note-off marker
+  const nox = Math.round(w * (NOTEOFF / TOTAL));
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(nox, 0); ctx.lineTo(nox, h);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = '#333';
+  ctx.font = '8px Courier New';
+  ctx.fillText('KEY ON', 4, h - 4);
+  ctx.textAlign = 'center';
+  ctx.fillText('OFF', nox, h - 4);
+  ctx.textAlign = 'left';
+}
+
+// ================================================================
+//  ALGORITHM DIAGRAM
+// ================================================================
+const ALG_CARRIERS = {
+  0:[3], 1:[3], 2:[3], 3:[3], 4:[1,3], 5:[1,2,3], 6:[1,2,3], 7:[0,1,2,3]
+};
+const ALG_CONNECTIONS = {
+  0: [{f:0,t:1},{f:1,t:2},{f:2,t:3}],
+  1: [{f:0,t:2},{f:1,t:2},{f:2,t:3}],
+  2: [{f:1,t:2},{f:0,t:3},{f:2,t:3}],
+  3: [{f:0,t:1},{f:1,t:3},{f:2,t:3}],
+  4: [{f:0,t:1},{f:2,t:3}],
+  5: [{f:0,t:1},{f:0,t:2},{f:0,t:3}],
+  6: [{f:0,t:1}],
+  7: [],
+};
+const ALG_DESC = [
+  '1→2→3→4','(1+2)→3→4','1+(2→3)→4',
+  '(1→2+3)→4','(1→2)+(3→4)','1→(2+3+4)',
+  '(1→2)+3+4','1+2+3+4',
+];
+
+function drawAlgorithm(alg) {
+  const cv  = document.getElementById('algCanvas');
+  const ctx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const cars  = ALG_CARRIERS[alg];
+  const conns = ALG_CONNECTIONS[alg];
+
+  // Operator box positions (horizontal layout)
+  const BOX = 16, GAP = 36;
+  const startX = 10;
+  const rowY   = 22;
+  const pos = [0,1,2,3].map(i => ({ x: startX + i * GAP, y: rowY }));
+
+  // Draw connections
+  ctx.lineWidth = 1.2;
+  conns.forEach(({f, t}) => {
+    const fp = pos[f], tp = pos[t];
+    ctx.strokeStyle = '#2a4a3a';
+    ctx.beginPath();
+    if (t === f + 1) {
+      // horizontal arrow
+      ctx.moveTo(fp.x + BOX, fp.y + BOX/2);
+      ctx.lineTo(tp.x - 2, tp.y + BOX/2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(tp.x - 2, tp.y + BOX/2);
+      ctx.lineTo(tp.x - 6, tp.y + BOX/2 - 3);
+      ctx.moveTo(tp.x - 2, tp.y + BOX/2);
+      ctx.lineTo(tp.x - 6, tp.y + BOX/2 + 3);
+      ctx.stroke();
+    } else {
+      // curved arc
+      const mx = (fp.x + tp.x) / 2 + BOX/2;
+      ctx.moveTo(fp.x + BOX/2, fp.y);
+      ctx.quadraticCurveTo(mx, fp.y - 15, tp.x + BOX/2, tp.y);
+      ctx.stroke();
+    }
+  });
+
+  // Feedback circle on OP1
+  ctx.strokeStyle = '#663300';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  ctx.arc(pos[0].x + BOX/2, pos[0].y - 10, 7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Output arrows (↓) for carriers
+  ctx.strokeStyle = '#00e87a';
+  ctx.lineWidth   = 1.5;
+  cars.forEach(i => {
+    const p = pos[i];
+    ctx.beginPath();
+    ctx.moveTo(p.x + BOX/2, p.y + BOX + 2);
+    ctx.lineTo(p.x + BOX/2, p.y + BOX + 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(p.x + BOX/2, p.y + BOX + 10);
+    ctx.lineTo(p.x + BOX/2 - 3, p.y + BOX + 6);
+    ctx.moveTo(p.x + BOX/2, p.y + BOX + 10);
+    ctx.lineTo(p.x + BOX/2 + 3, p.y + BOX + 6);
+    ctx.stroke();
+  });
+
+  // Boxes
+  pos.forEach((p, i) => {
+    const isCar = cars.includes(i);
+    ctx.fillStyle   = '#020202';
+    ctx.strokeStyle = isCar ? '#00e87a' : '#335544';
+    ctx.lineWidth   = 1.5;
+    ctx.fillRect(p.x, p.y, BOX, BOX);
+    ctx.strokeRect(p.x, p.y, BOX, BOX);
+    ctx.fillStyle = isCar ? '#00e87a' : '#557766';
+    ctx.font = '9px Courier New';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline= 'middle';
+    ctx.fillText(i + 1, p.x + BOX/2, p.y + BOX/2);
+  });
+  ctx.textBaseline = 'alphabetic';
+
+  // Description
+  ctx.fillStyle = '#2a3a30';
+  ctx.font  = '8px Courier New';
+  ctx.textAlign = 'left';
+  ctx.fillText(ALG_DESC[alg], startX, h - 5);
+}
+
+// ================================================================
+//  WAV EXPORT
+// ================================================================
+document.getElementById('wavBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('wavBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ RENDERING...';
+  await new Promise(r => setTimeout(r, 30));
+
+  const SR       = 44100;
+  const DUR      = 3.5;
+  const NOTEOFF  = 2.2;
+  const N        = Math.ceil(SR * DUR);
+  const noteOffN = Math.ceil(SR * NOTEOFF);
+
+  // Clone synth with current params
+  const ex = new FMSynth(SR);
+  ex.alg = synth.alg;
+  ex.fb  = synth.fb;
+  synth.ops.forEach((op, i) => Object.assign(ex.ops[i], op));
+  ex.masterVol = 0.85;
+  ex.noteOn(getCurrentFreq());
+
+  const buf = new Float32Array(N);
+  let peak = 0;
+  for (let i = 0; i < N; i++) {
+    if (i === noteOffN) ex.noteOff();
+    buf[i] = ex.tick();
+    if (Math.abs(buf[i]) > peak) peak = Math.abs(buf[i]);
+  }
+  // Normalize
+  const gain = peak > 0.01 ? 0.9 / peak : 1;
+  for (let i = 0; i < N; i++) buf[i] *= gain;
+
+  // Write WAV (16-bit PCM mono)
+  const dataBytes = N * 2;
+  const ab  = new ArrayBuffer(44 + dataBytes);
+  const dv  = new DataView(ab);
+  const ws  = (off, s) => { for (let k=0;k<s.length;k++) dv.setUint8(off+k, s.charCodeAt(k)); };
+  ws(0,'RIFF'); dv.setUint32(4, 36+dataBytes, true); ws(8,'WAVE');
+  ws(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,1,true); dv.setUint32(24,SR,true);
+  dv.setUint32(28,SR*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  ws(36,'data'); dv.setUint32(40,dataBytes,true);
+  let off = 44;
+  for (let i=0; i<N; i++) {
+    dv.setInt16(off, Math.max(-32768, Math.min(32767, buf[i]*32767)), true);
+    off += 2;
+  }
+  const blob = new Blob([ab], {type:'audio/wav'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'fm_sound.wav';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+  btn.textContent = '↓ WAV';
+  btn.disabled = false;
+});
+
+// ================================================================
+//  INIT
+// ================================================================
+buildNoteSelector();
+getCurrentFreq();
+buildOpUI();
+drawAlgorithm(0);
+
+// Draw oscilloscope loop
+requestAnimationFrame(drawOscilloscope);
+
+// Draw envelope once resize settles
+window.addEventListener('resize', () => {
+  drawEnvelope();
+  drawAlgorithm(synth.alg);
+});
+setTimeout(() => {
+  drawEnvelope();
+  drawAlgorithm(0);
+}, 100);
+</script>
+</body>
+</html>
