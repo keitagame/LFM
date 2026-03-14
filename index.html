@@ -584,20 +584,50 @@ this.triggerFlag = false;
     const dtC  = [0, 3.38, 6.76, 10.13, 0, -3.38, -6.76, -10.13][op.DT];
     const freq  = this.freq * mul * Math.pow(2, dtC / 1200);
     op.phase   += (2 * Math.PI * freq) / this.sr;
+const phaseInc = (2 * Math.PI * freq) / this.sr;
+const oldPhase = op.phase;
+op.phase += phaseInc;
+
+
+if (i === 3 && op.phase < oldPhase) {
+    this.triggerFlag = true;
+}
+
     this._envTick(op);
     const amp  = this._atten2amp(op.envAtten, op.TL);
     const out  = Math.sin(op.phase + mod) * amp;
     op.prevOut = out;
-const oldPhase = op.phase;
-op.phase += (2 * Math.PI * freq) / this.sr;
 
-// ★ キャリアの位相が一周した瞬間にトリガー
-if (i === 3 && op.phase < oldPhase) {  // OP4 をキャリアとする
-    this.triggerFlag = true;
-}
 
     return out;
   }
+_opTick(i, mod) {
+    const op   = this.ops[i];
+    const mul  = op.MUL === 0 ? 0.5 : op.MUL;
+    const dtC  = [0, 3.38, 6.76, 10.13, 0, -3.38, -6.76, -10.13][op.DT];
+    const freq = this.freq * mul * Math.pow(2, dtC / 1200);
+
+    // ★ 位相更新（1回だけ）
+    const phaseInc = (2 * Math.PI * freq) / this.sr;
+    const oldPhase = op.phase;
+    op.phase += phaseInc;
+
+    // ★ キャリアの位相が一周した瞬間にトリガー
+    const carrierIndex = 3; // あなたの alg では常に OP4 がキャリア
+    if (i === carrierIndex && op.phase < oldPhase) {
+        this.triggerFlag = true;
+    }
+
+    // EG
+    this._envTick(op);
+
+    // 出力
+    const amp = this._atten2amp(op.envAtten, op.TL);
+    const out = Math.sin(op.phase + mod) * amp;
+    op.prevOut = out;
+
+    return out;
+}
 
   // ── Full tick (one sample) ────────────────────────────────────
   tick() {
@@ -991,15 +1021,17 @@ function drawOscilloscope(ts) {
 
   const len = oscBuf.length;
   
-if (synth.triggerFlag) {
-    trigPos = oscWr;
+
+// ★ FMトリガー優先
+//if (synth.triggerFlag) {
+    //trigPos = (oscWr- w + len) & (len - 1);
+  trigPos = (oscWr - 1 - w + len) & (len - 1);
+
+    //lastTrigPos = trigPos;
     synth.triggerFlag = false;
-  }
-  for (let i = 8; i < len - w - 8; i++) {
-    const cur  = oscBuf[(oscWr - len + i + len) & (len-1)];
-  const next = oscBuf[(oscWr - len + i+1 + len) & (len-1)];
-    if (cur < 0 && next >= 0) { trigPos = i; break; }
-  }
+
+//} 
+
 
 
 
@@ -1008,12 +1040,15 @@ if (synth.triggerFlag) {
   oscCtx2.shadowColor = '#00e87a';
   oscCtx2.shadowBlur  = 5;
   oscCtx2.beginPath();
-  for (let x = 0; x < w; x++) {
-    const idx = (oscWr - len + trigPos + x + len * 2) & (len-1);
+for (let x = 0; x < w; x++) {
+    const idx = (trigPos + x) & (len - 1);  // ← これだけでOK
+ 
+
     const s   = oscBuf[idx];
     const y   = (h >> 1) - s * (h * 0.44);
     x === 0 ? oscCtx2.moveTo(x, y) : oscCtx2.lineTo(x, y);
-  }
+}
+
   oscCtx2.stroke();
   oscCtx2.shadowBlur = 0;
 }
