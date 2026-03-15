@@ -982,6 +982,8 @@ const oscCvs = document.getElementById('oscCanvas');
 const oscCtx2 = oscCvs.getContext('2d');
 let lastFpsTime = 0, frameCount = 0, fps = 0;
 let trigPos = 0;
+let oscViewStart = 0;
+let oscHold = 0;
 function drawOscilloscope(ts) {
   requestAnimationFrame(drawOscilloscope);
 
@@ -1020,17 +1022,19 @@ function drawOscilloscope(ts) {
   // Waveform — trigger on rising zero-cross
 
   const len = oscBuf.length;
-  
+ 
 
-// ★ FMトリガー優先
-//if (synth.triggerFlag) {
-    //trigPos = (oscWr- w + len) & (len - 1);
-  trigPos = (oscWr - 1 - w + len) & (len - 1);
+//if (oscHold === 0) {
 
-    //lastTrigPos = trigPos;
+    const samplesPerCycle = Math.floor(audioCtx.sampleRate / synth.freq);
+
+    oscViewStart = (oscWr - samplesPerCycle * 2 + len) & (len - 1);
+
+    oscHold = samplesPerCycle; // 少し固定
     synth.triggerFlag = false;
+//}
 
-//} 
+if (oscHold > 0) oscHold--;
 
 
 
@@ -1041,7 +1045,8 @@ function drawOscilloscope(ts) {
   oscCtx2.shadowBlur  = 0;
   oscCtx2.beginPath();
 for (let x = 0; x < w; x++) {
-    const idx = (trigPos + x) & (len - 1);  // ← これだけでOK
+    const idx = (oscViewStart + x) & (len - 1);
+    //const idx = (trigPos + x) & (len - 1);  // ← これだけでOK
  
 
     const s   = oscBuf[idx];
@@ -1336,6 +1341,65 @@ setTimeout(() => {
   drawEnvelope();
   drawAlgorithm(0);
 }, 100);
+// ================================================================
+// KEYBOARD PLAY
+// ================================================================
+
+// PCキーボード → 半音
+const KEYMAP = {
+  z:0, s:1, x:2, d:3, c:4, v:5, g:6,
+  b:7, h:8, n:9, j:10, m:11,
+  q:12, 2:13, w:14, 3:15, e:16, r:17, 5:18,
+  t:19, 6:20, y:21, 7:22, u:23
+};
+
+let baseOct = 4;
+let keyHeld = new Set();
+
+function midiToFreq(m){
+  return 140 * Math.pow(2,(m-69)/12);
+}
+
+window.addEventListener("keydown", e => {
+
+  const k = e.key.toLowerCase();
+
+  if(!(k in KEYMAP)) return;
+  if(keyHeld.has(k)) return;
+
+  keyHeld.add(k);
+
+  ensureAudio();
+
+  const midi =
+    (baseOct + 1) * 12 +
+    KEYMAP[k];
+
+  const freq = midiToFreq(midi);
+
+  synth.noteOn(freq);
+
+  document.getElementById("freqDisp").textContent =
+    freq.toFixed(2) + " Hz";
+
+  document.getElementById("statusDot").classList.add("on");
+
+});
+
+window.addEventListener("keyup", e => {
+
+  const k = e.key.toLowerCase();
+
+  if(!(k in KEYMAP)) return;
+
+  keyHeld.delete(k);
+
+  synth.noteOff();
+
+  if(!playing)
+    document.getElementById("statusDot").classList.remove("on");
+
+});
 </script>
 </body>
 </html>
